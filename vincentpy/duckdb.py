@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from .utils import get_env_var
 from pathlib import Path
-from typing import Any, List, Mapping, Optional, Sequence, Union
+from typing import Any, List, Optional, Sequence, Union
 from uuid import uuid4
 import duckdb
 import polars as pl
@@ -170,7 +170,6 @@ def _to_polars(data: DataLike, expected_columns: Sequence[str]) -> pl.DataFrame:
         raise ValueError("No rows to insert.")
 
     return df
-
 
 
 def insert(

@@ -1,1 +1,6 @@
 examples/example.duckdb
+*egg*
+.python-version
+AGENTS.md
+CLAUDE.md
+uv.lock

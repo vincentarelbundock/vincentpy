@@ -65,9 +65,7 @@ def _wrap_with_structure(config: LangChainConfig):
     )
 
 
-def invoke_langchain(
-    prompt_human: str, prompt_system: str, config: LangChainConfig
-) -> T:
+def invoke(prompt_human: str, prompt_system: str, config: LangChainConfig) -> T:
     """
     Execute a single LangChain chat call and return the parsed response.
     """
@@ -76,7 +74,7 @@ def invoke_langchain(
     return llm.invoke(messages)
 
 
-def invoke_langchain_batch(
+def invoke_batch(
     prompt_humans: Sequence[str], prompt_system: str, config: LangChainConfig
 ) -> list[T]:
     """
@@ -93,6 +91,6 @@ def invoke_langchain_batch(
 
 __all__ = [
     "LangChainConfig",
-    "invoke_langchain",
-    "invoke_langchain_batch",
+    "invoke",
+    "invoke_batch",
 ]
