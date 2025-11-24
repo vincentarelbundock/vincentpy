@@ -200,9 +200,47 @@ def insert(
     return df.height
 
 
+def clone(
+    remote: Union[str, Path],
+    local: Union[str, Path],
+    key: Optional[str] = None,
+    overwrite: bool = False,
+) -> Path:
+    """
+    Clone a DuckDB database to a local path and return the resolved destination.
+    """
+    local_path = Path(local).expanduser().resolve()
+    if local_path.exists():
+        if local_path.is_dir():
+            raise IsADirectoryError(f"Destination is a directory: {local_path}")
+        if not overwrite:
+            raise FileExistsError(
+                f"Destination already exists: {local_path}. Pass overwrite=True to replace it."
+            )
+        local_path.unlink()
+
+    local_path.parent.mkdir(parents=True, exist_ok=True)
+    created_file = not local_path.exists()
+
+    con = _connect_duckdb(remote, key)
+    try:
+        local_literal = _escape(str(local_path))
+        con.execute(f"ATTACH '{local_literal}' AS local_db")
+        con.execute("COPY FROM DATABASE main TO local_db")
+    except Exception:
+        if created_file and local_path.exists():
+            local_path.unlink()
+        raise
+    finally:
+        con.close()
+
+    return local_path
+
+
 __all__ = [
     "query",
     "query_df",
     "table",
     "insert",
+    "clone",
 ]
