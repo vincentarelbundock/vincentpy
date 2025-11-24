@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from .utils import get_env_var
 from pathlib import Path
-from typing import Any, List, Optional, Sequence, Union
+from typing import Any, List, Optional, Union
 from uuid import uuid4
 import duckdb
 import polars as pl
@@ -123,8 +123,8 @@ def table(
     return query_df(f"SELECT * FROM {table_name}", path, key)
 
 
-def _to_polars(data: DataLike, expected_columns: Sequence[str]) -> pl.DataFrame:
-    """Normalize insert input to a Polars DataFrame using the expected columns."""
+def _to_polars(data: DataLike) -> pl.DataFrame:
+    """Normalize insert input to a Polars DataFrame."""
     # 1. Convert input to a Polars DataFrame
     if isinstance(data, pl.DataFrame):
         df = data
@@ -150,25 +150,6 @@ def _to_polars(data: DataLike, expected_columns: Sequence[str]) -> pl.DataFrame:
     else:
         raise TypeError("data must be a Polars DataFrame or a dict.")
 
-    # 2. Shared column validation for both paths
-    cols = set(df.columns)
-    expected = set(expected_columns)
-
-    missing = expected - cols
-    extra = cols - expected
-
-    if missing:
-        raise ValueError(f"Missing columns: {sorted(missing)}")
-    if extra:
-        raise ValueError(f"Unexpected columns: {sorted(extra)}")
-
-    # 3. Enforce column order
-    df = df.select(list(expected_columns))
-
-    # 4. Non-empty check
-    if df.height == 0:
-        raise ValueError("No rows to insert.")
-
     return df
 
 
@@ -177,14 +158,33 @@ def insert(
     data: DataLike,
     path: Optional[Union[str, Path]] = None,
     key: Optional[str] = None,
+    strict: bool = True,
 ) -> int:
     """
     Insert rows into an existing DuckDB table using a DataFrame or mapping.
+
+    When ``strict`` is True, validate the input columns against the table schema
+    before inserting.
     """
 
     expected_columns = table(table_name, path, key).columns
     expected_order = list(expected_columns)
-    df = _to_polars(data, expected_order)
+    df = _to_polars(data)
+
+    if df.height == 0:
+        raise ValueError("No rows to insert.")
+
+    if strict:
+        cols = set(df.columns)
+        expected = set(expected_order)
+        missing = expected - cols
+        extra = cols - expected
+        if missing:
+            raise ValueError(f"Missing columns: {sorted(missing)}")
+        if extra:
+            raise ValueError(f"Unexpected columns: {sorted(extra)}")
+
+    df = df.select(expected_order)
 
     con = _connect_duckdb(path, key)
     tmp_view = f"_vincentpy_insert_{uuid4().hex}"
