@@ -174,24 +174,36 @@ def insert(
     if df.height == 0:
         raise ValueError("No rows to insert.")
 
+    cols = set(df.columns)
+    expected = set(expected_order)
+    insert_columns: list[str]
+
     if strict:
-        cols = set(df.columns)
-        expected = set(expected_order)
         missing = expected - cols
         extra = cols - expected
         if missing:
             raise ValueError(f"Missing columns: {sorted(missing)}")
         if extra:
             raise ValueError(f"Unexpected columns: {sorted(extra)}")
+        insert_columns = expected_order
+    else:
+        # Only insert columns that exist in both the table and the provided data.
+        insert_columns = [col for col in expected_order if col in cols]
+        if not insert_columns:
+            raise ValueError("No columns provided for insert.")
 
-    df = df.select(expected_order)
+    df = df.select(insert_columns)
 
     con = _connect_duckdb(path, key)
     tmp_view = f"_vincentpy_insert_{uuid4().hex}"
     try:
         con.register(tmp_view, df)
         try:
-            con.execute(f'INSERT INTO "{table_name}" SELECT * FROM {tmp_view}')
+            cols_sql = ", ".join(f'"{col}"' for col in insert_columns)
+            con.execute(
+                f'INSERT INTO "{table_name}" ({cols_sql}) '
+                f"SELECT {cols_sql} FROM {tmp_view}"
+            )
         finally:
             con.unregister(tmp_view)
     finally:
