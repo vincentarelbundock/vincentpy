@@ -88,6 +88,7 @@ def invoke_batch(
 
     When ``as_completed`` is True, yield each response as soon as it finishes,
     which lets callers start processing without waiting for the full batch.
+    Returns ``(index, output)`` tuples in that mode to preserve input order.
     """
     llm = _wrap_with_structure(config)
     messages_list = [
