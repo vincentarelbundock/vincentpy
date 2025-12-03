@@ -10,7 +10,7 @@ the caller to provide the minimal information needed to run a chat model.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence, Type, TypeVar
+from typing import Any, Iterable, Optional, Sequence, Type, TypeVar
 
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -75,17 +75,26 @@ def invoke(prompt_human: str, prompt_system: str, config: LangChainConfig) -> T:
 
 
 def invoke_batch(
-    prompt_humans: Sequence[str], prompt_system: str, config: LangChainConfig
-) -> list[T]:
+    prompt_humans: Sequence[str],
+    prompt_system: str,
+    config: LangChainConfig,
+    *,
+    as_completed: bool = False,
+) -> Iterable[T] | list[T]:
     """
     Execute a batch of LangChain chats with a shared system prompt.
 
     The inputs are processed in parallel wherever the LangChain backend allows.
+
+    When ``as_completed`` is True, yield each response as soon as it finishes,
+    which lets callers start processing without waiting for the full batch.
     """
     llm = _wrap_with_structure(config)
     messages_list = [
         _build_messages(prompt_human, prompt_system) for prompt_human in prompt_humans
     ]
+    if as_completed:
+        return llm.batch_as_completed(messages_list)
     return llm.batch(messages_list)
 
 
