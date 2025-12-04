@@ -94,33 +94,68 @@ def _connect_duckdb(
     return _connect_local(resolved, key)
 
 
+def _get_connection(
+    con: Optional[duckdb.DuckDBPyConnection],
+    path: Optional[Union[str, Path]],
+    key: Optional[str],
+) -> tuple[duckdb.DuckDBPyConnection, bool]:
+    """Return a connection and whether the caller should close it."""
+    if con is not None:
+        if path is not None or key is not None:
+            raise ValueError("Provide either an existing connection or a path/key, not both.")
+        return con, False
+
+    return _connect_duckdb(path, key), True
+
+
 def query(
-    sql: str, path: Optional[Union[str, Path]] = None, key: Optional[str] = None
+    sql: str,
+    path: Optional[Union[str, Path]] = None,
+    key: Optional[str] = None,
+    con: Optional[duckdb.DuckDBPyConnection] = None,
 ) -> List[tuple]:
-    """Execute a SQL query and return a list of tuples."""
-    con = _connect_duckdb(path, key)
+    """
+    Execute a SQL query and return a list of tuples.
+
+    If ``con`` is provided it will be used and left open; otherwise the function
+    will connect using ``path``/``key`` and close the connection afterwards.
+    """
+    con, should_close = _get_connection(con, path, key)
     try:
         return con.execute(sql).fetchall()
     finally:
-        con.close()
+        if should_close:
+            con.close()
 
 
 def query_df(
-    sql: str, path: Optional[Union[str, Path]] = None, key: Optional[str] = None
+    sql: str,
+    path: Optional[Union[str, Path]] = None,
+    key: Optional[str] = None,
+    con: Optional[duckdb.DuckDBPyConnection] = None,
 ) -> pl.DataFrame:
-    """Execute a SQL query and return the results as a Polars DataFrame."""
-    con = _connect_duckdb(path, key)
+    """
+    Execute a SQL query and return the results as a Polars DataFrame.
+
+    If ``con`` is provided it will be used and left open; otherwise the function
+    will connect using ``path``/``key`` and close the connection afterwards.
+    """
+    con, should_close = _get_connection(con, path, key)
     try:
         return con.sql(sql).pl()
     finally:
-        con.close()
+        if should_close:
+            con.close()
 
 
 def table(
-    table_name: str, path: Optional[Union[str, Path]] = None, key: Optional[str] = None
+    table_name: str,
+    path: Optional[Union[str, Path]] = None,
+    key: Optional[str] = None,
+    con: Optional[duckdb.DuckDBPyConnection] = None,
 ) -> pl.DataFrame:
     """Fetch every row from a table as a Polars DataFrame."""
-    return query_df(f"SELECT * FROM {table_name}", path, key)
+    return query_df(f"SELECT * FROM {table_name}", path=path, key=key, con=con)
 
 
 def _to_polars(data: DataLike) -> pl.DataFrame:
@@ -159,15 +194,19 @@ def insert(
     path: Optional[Union[str, Path]] = None,
     key: Optional[str] = None,
     strict: bool = True,
+    con: Optional[duckdb.DuckDBPyConnection] = None,
 ) -> int:
     """
     Insert rows into an existing DuckDB table using a DataFrame or mapping.
 
     When ``strict`` is True, validate the input columns against the table schema
-    before inserting.
+    before inserting. If ``con`` is provided it will be used and left open;
+    otherwise the function will connect using ``path``/``key`` and close the
+    connection afterwards.
     """
 
-    expected_columns = table(table_name, path, key).columns
+    con, should_close = _get_connection(con, path, key)
+    expected_columns = table(table_name, con=con).columns
     expected_order = list(expected_columns)
     df = _to_polars(data)
 
@@ -194,7 +233,6 @@ def insert(
 
     df = df.select(insert_columns)
 
-    con = _connect_duckdb(path, key)
     tmp_view = f"_vincentpy_insert_{uuid4().hex}"
     try:
         con.register(tmp_view, df)
@@ -207,7 +245,8 @@ def insert(
         finally:
             con.unregister(tmp_view)
     finally:
-        con.close()
+        if should_close:
+            con.close()
 
     return df.height
 
