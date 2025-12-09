@@ -22,7 +22,7 @@ class FactResponse(BaseModel):
 
 
 # Single query example
-config = llm.LangChainConfig(
+model_kwargs = dict(
     coder="gpt-5-nano",
     provider="openai",
     structured_class=FactResponse,
@@ -33,7 +33,7 @@ config = llm.LangChainConfig(
 prompt_system = "You are a knowledgeable assistant providing interesting facts."
 prompt_human = "Tell me an interesting fact about Python programming language."
 
-result = llm.invoke(prompt_human, prompt_system, config)
+result = llm.invoke(prompt_human, prompt_system, **model_kwargs)
 parsed = result
 
 print(f"Topic: {parsed.topic}")
@@ -52,7 +52,7 @@ batch_prompts = [
     for lang in languages
 ]
 
-batch_results = llm.invoke_batch(batch_prompts, prompt_system, config)
+batch_results = llm.invoke_batch(batch_prompts, prompt_system, **model_kwargs)
 
 for lang, result in zip(languages, batch_results):
     print(f"Language: {lang}")
@@ -66,14 +66,14 @@ print("\n" + "=" * 80)
 print("PLAIN TEXT EXAMPLE: No structured output class")
 print("=" * 80 + "\n")
 
-plain_config = llm.LangChainConfig(
+prompt_system = "You are a helpful assistant."
+prompt_human = "Write a haiku about databases."
+
+plain_result = llm.invoke(
+    prompt_human,
+    prompt_system,
     coder="gpt-5-nano",
     provider="openai",
     temperature=0.7,
 )
-
-prompt_system = "You are a helpful assistant."
-prompt_human = "Write a haiku about databases."
-
-plain_result = llm.invoke(prompt_human, prompt_system, plain_config)
 print(plain_result.content)
