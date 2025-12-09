@@ -28,6 +28,7 @@ class LangChainConfig:
         provider: Model provider understood by LangChain.
         structured_class: Optional Pydantic class describing the response schema.
         temperature: Optional temperature override.
+        service_tier: Optional OpenAI service tier identifier.
         include_raw: When True, keep the raw LLM output alongside parsed data.
     """
 
@@ -35,6 +36,7 @@ class LangChainConfig:
     provider: str
     structured_class: Optional[Type[Any]] = None
     temperature: Optional[float] = None
+    service_tier: Optional[str] = None
     include_raw: bool = True
 
     def build_chat_model(self):
@@ -42,7 +44,9 @@ class LangChainConfig:
         kwargs: dict[str, Any] = {"model_provider": self.provider}
         if self.temperature is not None:
             kwargs["temperature"] = self.temperature
-        return init_chat_model(self.coder, **kwargs)
+        if self.provider == "openai" and self.service_tier is not None:
+            kwargs["service_tier"] = self.service_tier
+        return init_chat_model(model=self.coder, **kwargs)
 
 
 def _build_messages(prompt_human: str, prompt_system: str) -> list:
