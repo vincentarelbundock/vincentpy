@@ -92,7 +92,7 @@ def _sanitize_prompt_sequence(prompts: Sequence[str]) -> list[str]:
 
 
 def _build_chat_model(
-    coder: str,
+    model: str,
     provider: str,
     *,
     temperature: Optional[float] = None,
@@ -100,7 +100,7 @@ def _build_chat_model(
     reasoning_effort: Optional[str] = None,
     reasoning: Optional[dict[str, Any]] = None,
 ):
-    coder = _sanitize_non_empty_str(coder, "coder")
+    model = _sanitize_non_empty_str(model, "model")
     provider = _sanitize_non_empty_str(provider, "provider")
     temperature = _sanitize_temperature(temperature)
     service_tier = _sanitize_optional_str(service_tier, "service_tier")
@@ -116,7 +116,7 @@ def _build_chat_model(
         kwargs["reasoning_effort"] = reasoning_effort
     if reasoning is not None:
         kwargs["reasoning"] = reasoning
-    return init_chat_model(model=coder, **kwargs)
+    return init_chat_model(model=model, **kwargs)
 
 
 def _build_messages(prompt_human: str, prompt_system: str) -> list:
@@ -129,7 +129,7 @@ def _build_messages(prompt_human: str, prompt_system: str) -> list:
 
 def _wrap_with_structure(
     *,
-    coder: str,
+    model: str,
     provider: str,
     structured_class: Optional[Type[Any]] = None,
     temperature: Optional[float] = None,
@@ -140,7 +140,7 @@ def _wrap_with_structure(
 ):
     """Convert the base chat model into a structured-output chain when requested."""
     llm = _build_chat_model(
-        coder=coder,
+        model=model,
         provider=provider,
         temperature=temperature,
         service_tier=service_tier,
@@ -160,7 +160,7 @@ def invoke(
     prompt_human: str,
     prompt_system: str,
     *,
-    coder: str,
+    model: str,
     provider: str,
     structured_class: Optional[Type[Any]] = None,
     temperature: Optional[float] = None,
@@ -173,7 +173,7 @@ def invoke(
     prompt_human, prompt_system = _sanitize_prompts(prompt_human, prompt_system)
 
     llm = _wrap_with_structure(
-        coder=coder,
+        model=model,
         provider=provider,
         structured_class=structured_class,
         temperature=temperature,
@@ -190,7 +190,7 @@ def invoke_batch(
     prompt_humans: Sequence[str],
     prompt_system: str,
     *,
-    coder: str,
+    model: str,
     provider: str,
     structured_class: Optional[Type[Any]] = None,
     temperature: Optional[float] = None,
@@ -213,7 +213,7 @@ def invoke_batch(
     sanitized_prompts = _sanitize_prompt_sequence(prompt_humans)
 
     llm = _wrap_with_structure(
-        coder=coder,
+        model=model,
         provider=provider,
         structured_class=structured_class,
         temperature=temperature,
