@@ -45,16 +45,21 @@ def _connect_local(path: str, key: Optional[str] = None) -> duckdb.DuckDBPyConne
     return con
 
 
+def _ensure_motherduck_extension(con: duckdb.DuckDBPyConnection) -> None:
+    """Load the MotherDuck extension, installing it if necessary."""
+    try:
+        con.execute("LOAD 'motherduck'")
+    except duckdb.BinderException:
+        con.execute("INSTALL motherduck")
+        con.execute("LOAD 'motherduck'")
+
+
 def _connect_motherduck(resolved: str) -> duckdb.DuckDBPyConnection:
     """Connect to MotherDuck using the ``md:`` URI syntax."""
     get_env_var("MOTHERDUCK_TOKEN")  # ensures credentials are available
     con = duckdb.connect()
     try:
-        try:
-            con.execute("LOAD 'motherduck'")
-        except duckdb.BinderException:
-            con.execute("INSTALL motherduck")
-            con.execute("LOAD 'motherduck'")
+        _ensure_motherduck_extension(con)
         con.execute("ATTACH 'md:'")
         con.execute(f"USE {resolved[3:]}")
         return con
@@ -273,17 +278,43 @@ def clone(
     local_path.parent.mkdir(parents=True, exist_ok=True)
     created_file = not local_path.exists()
 
-    con = _connect_duckdb(remote, key)
-    try:
-        local_literal = _escape(str(local_path))
-        con.execute(f"ATTACH '{local_literal}' AS local_db")
-        con.execute("COPY FROM DATABASE main TO local_db")
-    except Exception:
-        if created_file and local_path.exists():
-            local_path.unlink()
-        raise
-    finally:
-        con.close()
+    remote_str = str(remote)
+    is_motherduck = remote_str.lower().startswith("md:")
+
+    if is_motherduck and key:
+        raise ValueError("Encryption keys are not supported for MotherDuck clones.")
+
+    if is_motherduck:
+        con = duckdb.connect()
+        try:
+            _ensure_motherduck_extension(con)
+            remote_alias = "motherduck_remote"
+            local_alias = "local_db"
+            remote_literal = _escape(remote_str)
+            local_literal = _escape(str(local_path))
+            con.execute(f"ATTACH '{remote_literal}' AS {remote_alias}")
+            con.execute(f"ATTACH '{local_literal}' AS {local_alias}")
+            con.execute(f"COPY FROM DATABASE {remote_alias} TO {local_alias}")
+            con.execute(f"DETACH {local_alias}")
+            con.execute(f"DETACH {remote_alias}")
+        except Exception:
+            if created_file and local_path.exists():
+                local_path.unlink()
+            raise
+        finally:
+            con.close()
+    else:
+        con = _connect_duckdb(remote, key)
+        try:
+            local_literal = _escape(str(local_path))
+            con.execute(f"ATTACH '{local_literal}' AS local_db")
+            con.execute("COPY FROM DATABASE main TO local_db")
+        except Exception:
+            if created_file and local_path.exists():
+                local_path.unlink()
+            raise
+        finally:
+            con.close()
 
     return local_path
 
