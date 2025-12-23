@@ -50,26 +50,25 @@ def _sanitize_include_raw(include_raw: bool) -> bool:
     return include_raw
 
 
-def _sanitize_reasoning_effort(
-    reasoning_effort: Optional[str], provider: str
-) -> Optional[str]:
-    if reasoning_effort is None:
-        return None
-    assert (
-        provider == "openai"
-    ), "reasoning_effort is only supported for the openai provider"
-    assert isinstance(reasoning_effort, str), "reasoning_effort must be a string"
-    reasoning_effort = reasoning_effort.lower().strip()
-    allowed = {"minimal", "low", "medium", "high"}
-    assert reasoning_effort in allowed, f"reasoning_effort must be one of {sorted(allowed)}"
-    return reasoning_effort
-
-
 def _sanitize_reasoning(reasoning: Optional[dict[str, Any]], provider: str):
     if reasoning is None:
         return None
     assert provider == "openai", "reasoning is only supported for the openai provider"
     assert isinstance(reasoning, dict), "reasoning must be a dict"
+
+    # Validate that only "effort" key is present
+    allowed_keys = {"effort"}
+    invalid_keys = set(reasoning.keys()) - allowed_keys
+    assert not invalid_keys, f"reasoning dict contains invalid keys: {sorted(invalid_keys)}. Only 'effort' is allowed"
+
+    # Validate effort value if present
+    if "effort" in reasoning:
+        effort = reasoning["effort"]
+        assert isinstance(effort, str), "reasoning['effort'] must be a string"
+        allowed_efforts = {"low", "medium", "high"}
+        assert effort in allowed_efforts, f"reasoning['effort'] must be one of {sorted(allowed_efforts)}"
+        reasoning = {"effort": effort}
+
     return reasoning
 
 
@@ -97,14 +96,12 @@ def _build_chat_model(
     *,
     temperature: Optional[float] = None,
     service_tier: Optional[str] = None,
-    reasoning_effort: Optional[str] = None,
     reasoning: Optional[dict[str, Any]] = None,
 ):
     model = _sanitize_non_empty_str(model, "model")
     provider = _sanitize_non_empty_str(provider, "provider")
     temperature = _sanitize_temperature(temperature)
     service_tier = _sanitize_optional_str(service_tier, "service_tier")
-    reasoning_effort = _sanitize_reasoning_effort(reasoning_effort, provider)
     reasoning = _sanitize_reasoning(reasoning, provider)
 
     kwargs: dict[str, Any] = {"model_provider": provider}
@@ -112,8 +109,6 @@ def _build_chat_model(
         kwargs["temperature"] = temperature
     if provider == "openai" and service_tier is not None:
         kwargs["service_tier"] = service_tier
-    if reasoning_effort is not None:
-        kwargs["reasoning_effort"] = reasoning_effort
     if reasoning is not None:
         kwargs["reasoning"] = reasoning
     return init_chat_model(model=model, **kwargs)
@@ -135,7 +130,6 @@ def _wrap_with_structure(
     temperature: Optional[float] = None,
     service_tier: Optional[str] = None,
     include_raw: bool = True,
-    reasoning_effort: Optional[str] = None,
     reasoning: Optional[dict[str, Any]] = None,
 ):
     """Convert the base chat model into a structured-output chain when requested."""
@@ -144,7 +138,6 @@ def _wrap_with_structure(
         provider=provider,
         temperature=temperature,
         service_tier=service_tier,
-        reasoning_effort=reasoning_effort,
         reasoning=reasoning,
     )
 
@@ -166,7 +159,6 @@ def invoke(
     temperature: Optional[float] = None,
     service_tier: Optional[str] = None,
     include_raw: bool = True,
-    reasoning_effort: Optional[str] = None,
     reasoning: Optional[dict[str, Any]] = None,
 ) -> T:
     """Execute a single LangChain chat call and return the parsed response."""
@@ -179,7 +171,6 @@ def invoke(
         temperature=temperature,
         service_tier=service_tier,
         include_raw=include_raw,
-        reasoning_effort=reasoning_effort,
         reasoning=reasoning,
     )
     messages = _build_messages(prompt_human, prompt_system)
@@ -196,7 +187,6 @@ def invoke_batch(
     temperature: Optional[float] = None,
     service_tier: Optional[str] = None,
     include_raw: bool = True,
-    reasoning_effort: Optional[str] = None,
     reasoning: Optional[dict[str, Any]] = None,
     as_completed: bool = False,
 ) -> Iterable[T] | list[T]:
@@ -205,9 +195,9 @@ def invoke_batch(
 
     The inputs are processed in parallel wherever the LangChain backend allows.
 
-    When ``as_completed`` is True, yield each response as soon as it finishes,
-    which lets callers start processing without waiting for the full batch.
-    Returns ``(index, output)`` tuples in that mode to preserve input order.
+    When ``as_completed`` is True, returns an iterable that yields results as
+    they complete (via ``llm.batch_as_completed``). The exact format depends on
+    the LangChain implementation; consult the LangChain docs for details.
     """
     prompt_system = _sanitize_non_empty_str(prompt_system, "prompt_system")
     sanitized_prompts = _sanitize_prompt_sequence(prompt_humans)
@@ -219,7 +209,6 @@ def invoke_batch(
         temperature=temperature,
         service_tier=service_tier,
         include_raw=include_raw,
-        reasoning_effort=reasoning_effort,
         reasoning=reasoning,
     )
     messages_list = [_build_messages(prompt, prompt_system) for prompt in sanitized_prompts]

@@ -104,3 +104,32 @@ fireworks_result = llm.invoke(
 print(f"Tip: {fireworks_result.tip}")
 print(f"Why it helps: {fireworks_result.why_it_helps}")
 print(f"Time to try: {fireworks_result.time_to_try}")
+
+
+# GPT-5-mini example without reasoning
+print("\n" + "=" * 80)
+print("GPT-5-MINI EXAMPLE: Basic usage without reasoning")
+print("=" * 80 + "\n")
+
+gpt5_result = llm.invoke(
+    prompt_human="What is the capital of France?",
+    prompt_system="You are a helpful assistant.",
+    model="gpt-5-mini-2025-08-07",
+    provider="openai",
+)
+print(gpt5_result.content)
+
+
+# GPT-5-mini example with reasoning
+print("\n" + "=" * 80)
+print("GPT-5-MINI EXAMPLE: Using reasoning with medium effort")
+print("=" * 80 + "\n")
+
+gpt5_reasoning_result = llm.invoke(
+    prompt_human="Solve this: If a train travels 120 miles in 2 hours, then speeds up and travels 200 miles in the next 2.5 hours, what is the average speed for the entire journey?",
+    prompt_system="You are a math tutor. Show your reasoning step by step.",
+    model="gpt-5-mini-2025-08-07",
+    provider="openai",
+    reasoning={"effort": "medium"},
+)
+print(gpt5_reasoning_result.content)
