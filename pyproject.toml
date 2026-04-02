@@ -1,11 +1,11 @@
 [project]
 name = "vincentpy"
-version = "0.0.7"
+version = "0.0.8"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "duckdb==1.4.1",
+    "duckdb==1.5.1",
     "langchain>=1.0.8",
     "langchain-openai",
     "langchain-fireworks",
